@@ -17,7 +17,7 @@ fi
 # get target Node IP (new server)
 while true; do
     read -e -p "Enter NEW server IP (destination): " -i $dstNode dstNode
-    ssh-copy-id root@$dstNode 2>/dev/null
+    ssh-copy-id -o ConnectTimeout=5 root@$dstNode 2>/dev/null
     ret=$?
     if [ $ret -eq 0 ]; then
         printf "[$OK] Connect to $dstNode success! \n"
@@ -26,6 +26,8 @@ while true; do
         printf "[$FAIL] Connect to $dstNode error, Please try again.. \n"
     fi
 done
+
+SSH="ssh -o BatchMode=yes -o ConnectTimeout=5 root@$dstNode"
 
 # Print current lxc containers and virtual machines
 eval "pct list"
@@ -63,7 +65,7 @@ while true; do
     while true; do
         read -e -p "Enter NEW ID on target server: " -i $VMID_NEW VMID_NEW
         # check is ID available
-        eval "ssh -o BatchMode=yes root@$dstNode grep -Eq '.$VMID_NEW.:' /etc/pve/.vmlist"
+        eval "$SSH grep -Eq '.$VMID_NEW.:' /etc/pve/.vmlist"
         ret=$?
         if [ $ret -eq 0 ]; then
             printf "[$FAIL] ID $VMID_NEW already in use! \n"
@@ -142,7 +144,7 @@ while true; do
             lvsize=$(lvdisplay /dev/pve/$vol --units b | grep "LV Size" | grep -oE [0-9]+)
             echo "lvsize is $lvsize b"
             # Create zfs dataset on dst server
-            eval "ssh -o BatchMode=yes root@$dstNode  zfs create -o acltype=posixacl -o xattr=sa -o refquota=$lvsize rpool/data/$dataset"
+            eval "$SSH  zfs create -o acltype=posixacl -o xattr=sa -o refquota=$lvsize rpool/data/$dataset"
             ret=$?
             if [ $ret -eq 0 ]; then
                 printf "[$OK] Dataset $dataset created \n"
@@ -171,7 +173,7 @@ while true; do
             exit 255
         fi
         # Transform config on dst server
-        eval "ssh -o BatchMode=yes root@$dstNode sed -i -E \'s/local-lvm:vm-$VMID/local-zfs:subvol-$VMID_NEW/\' /etc/pve/local/lxc/$VMID_NEW.conf"
+        eval "$SSH sed -i -E \'s/local-lvm:vm-$VMID/local-zfs:subvol-$VMID_NEW/\' /etc/pve/local/lxc/$VMID_NEW.conf"
         ret=$?
         if [ $ret -eq 0 ]; then
             printf "[$OK] Config file transformed \n"
@@ -238,7 +240,7 @@ while true; do
             lvsize=$(lvdisplay /dev/pve/$vol --units b | grep "LV Size" | grep -oE [0-9]+)
             echo "lvsize is $lvsize b"
             # Create zfs dataset on dst server
-            eval "ssh -o BatchMode=yes root@$dstNode  zfs create -s -V $lvsize rpool/data/$zvol"
+            eval "$SSH  zfs create -s -V $lvsize rpool/data/$zvol"
             ret=$?
             if [ $ret -eq 0 ]; then
                 printf "[$OK] zvol $zvol created \n"
@@ -266,7 +268,7 @@ while true; do
             exit 255
         fi
         # Transform config on dst server
-        eval "ssh -o BatchMode=yes root@$dstNode sed -i -E \'s/local-lvm:vm-$VMID/local-zfs:vm-$VMID_NEW/\' /etc/pve/local/qemu-server/$VMID_NEW.conf"
+        eval "$SSH sed -i -E \'s/local-lvm:vm-$VMID/local-zfs:vm-$VMID_NEW/\' /etc/pve/local/qemu-server/$VMID_NEW.conf"
         ret=$?
         if [ $ret -eq 0 ]; then
             printf "[$OK] Config file transformed \n"
